@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-multipart
+qdrant-client
+fastembed
+pypdf
+requests
+numpy
+pandas
+python-dotenv
+groq
+ragas
+datasets
+langchain-groq
+langchain-ollama

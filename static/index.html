@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsightRAG</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #1a1a1a;
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  #eval-stats { font-size: 12px; color: #ccc; }
+
+  .upload-bar {
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .upload-bar input[type="file"] { flex: 1; max-width: 300px; }
+  .upload-bar button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .upload-bar button:disabled { background: #999; cursor: not-allowed; }
+  #upload-status { font-size: 13px; color: #555; }
+
+  #chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .msg {
+    padding: 12px 16px;
+    border-radius: 12px;
+    max-width: 75%;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .msg.user {
+    background: #2563eb;
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant {
+    background: white;
+    border: 1px solid #e0e0e0;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .msg .meta {
+    font-size: 12px;
+    color: #999;
+    margin-top: 6px;
+  }
+  .msg.assistant .meta { color: #888; }
+
+  #input-bar {
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    padding: 16px 24px;
+    display: flex;
+    gap: 12px;
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  #question-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: none;
+  }
+  #send-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 0 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #send-btn:disabled { background: #999; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>InsightRAG</h1>
+  <div id="eval-stats"></div>
+</header>
+
+<div class="upload-bar">
+  <input type="file" id="pdf-input" accept="application/pdf">
+  <button id="upload-btn" onclick="uploadPDF()">Upload PDF</button>
+  <span id="upload-status"></span>
+</div>
+
+<div id="chat-area"></div>
+
+<div id="input-bar">
+  <textarea id="question-input" rows="1" placeholder="Apna sawaal poocho..."></textarea>
+  <button id="send-btn" onclick="sendQuestion()">Send</button>
+</div>
+
+<script>
+const API_BASE = "http://127.0.0.1:8000";
+
+async function loadEvalStats() {
+  try {
+    const res = await fetch(`${API_BASE}/eval-stats`);
+    const data = await res.json();
+    const el = document.getElementById("eval-stats");
+
+    if (!data.available || !data.scores) {
+      el.textContent = "";
+      return;
+    }
+
+    const s = data.scores;
+    el.textContent = `Eval (n=${data.num_questions}): Faithfulness ${s.faithfulness} | Relevancy ${s.answer_relevancy} | Precision ${s.context_precision} | Recall ${s.context_recall}`;
+  } catch (err) {
+    // Silently fail — eval stats optional hai, page kaam karta rahe
+  }
+}
+
+loadEvalStats();
+
+async function uploadPDF() {
+  const fileInput = document.getElementById("pdf-input");
+  const statusEl = document.getElementById("upload-status");
+  const btn = document.getElementById("upload-btn");
+
+  if (!fileInput.files.length) {
+    statusEl.textContent = "Pehle PDF select karo";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  btn.disabled = true;
+  statusEl.textContent = "Uploading aur processing ho raha hai...";
+
+  try {
+    const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || "Upload fail hua");
+
+    statusEl.textContent = `"${data.filename}" upload ho gaya (${data.chunks_added} chunks)`;
+    fileInput.value = "";
+  } catch (err) {
+    statusEl.textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function addMessage(text, role, meta) {
+  const chatArea = document.getElementById("chat-area");
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `msg ${role}`;
+  msgDiv.textContent = text;
+
+  if (meta) {
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "meta";
+    metaDiv.textContent = meta;
+    msgDiv.appendChild(metaDiv);
+  }
+
+  chatArea.appendChild(msgDiv);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  return msgDiv;
+}
+
+async function sendQuestion() {
+  const input = document.getElementById("question-input");
+  const sendBtn = document.getElementById("send-btn");
+  const question = input.value.trim();
+
+  if (!question) return;
+
+  addMessage(question, "user");
+  input.value = "";
+  sendBtn.disabled = true;
+
+  const loadingMsg = addMessage("Soch raha hu...", "assistant");
+
+  try {
+    const res = await fetch(`${API_BASE}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || "Kuch galat ho gaya");
+
+    loadingMsg.textContent = data.answer;
+
+    if (data.answered && data.pages.length) {
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "meta";
+      metaDiv.textContent = `Source: Page ${data.pages.join(", ")} | Confidence: ${data.confidence.toFixed(2)}`;
+      loadingMsg.appendChild(metaDiv);
+    }
+  } catch (err) {
+    loadingMsg.textContent = `Error: ${err.message}`;
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+document.getElementById("question-input").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendQuestion();
+  }
+});
+</script>
+
+</body>
+</html>
