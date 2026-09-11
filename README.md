@@ -124,8 +124,7 @@ python eval.py
 This evaluates the pipeline against a 20-question test set and saves results to `eval_results.csv`.
 
 ## Project Structure
-
-​```
+```
 InsightRAG/
 ├── main.py              — Core RAG pipeline: PDF loading, chunking, embeddings, retrieval, generation
 ├── api.py               — FastAPI backend: /upload, /ask, /eval-stats endpoints
@@ -139,5 +138,4 @@ InsightRAG/
 ├── docker-compose.yml
 ├── requirements.txt
 └── README.md
-​```
-
+```
