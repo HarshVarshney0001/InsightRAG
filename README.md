@@ -74,3 +74,70 @@ During development, this evaluation pipeline caught real issues — including a 
 
 <img width="1110" height="645" alt="Screenshot 2026-09-11 003834" src="https://github.com/user-attachments/assets/b8602c12-fb95-48c3-a8b7-ab8806cdbb43" />
 
+## Setup Instructions
+
+### Option 1: Run with Docker (recommended)
+
+No Python setup needed — everything runs in containers.
+
+1. Clone the repository:
+
+git clone https://github.com/HarshVarshney0001/InsightRAG.git
+cd InsightRAG
+
+2. Create a `.env` file in the project root with your Groq API key:
+
+GROQ_API_KEY=your_key_here
+
+(Get a free key at [console.groq.com](https://console.groq.com))
+
+3. Run:
+
+docker-compose up --build
+
+4. Open your browser at `http://localhost:8000/`
+
+5. Upload a PDF and start asking questions.
+
+### Option 2: Run locally (without Docker)
+
+1. Install dependencies:
+
+pip install -r requirements.txt
+
+2. Make sure Qdrant is running locally (via Docker or standalone):
+
+docker run -p 6333:6333 qdrant/qdrant
+
+3. Add your Groq API key to a `.env` file (see above).
+
+4. Run the API:
+
+uvicorn api:app --reload
+
+5. Open your browser at `http://localhost:8000/`
+
+### Running the Evaluation Script
+
+python eval.py
+
+This evaluates the pipeline against a 20-question test set and saves results to `eval_results.csv`.
+
+## Project Structure
+
+​```
+InsightRAG/
+├── main.py              — Core RAG pipeline: PDF loading, chunking, embeddings, retrieval, generation
+├── api.py               — FastAPI backend: /upload, /ask, /eval-stats endpoints
+├── eval.py              — RAGAS-based automated evaluation script
+├── static/
+│   └── index.html       — Chat UI (upload + Q&A interface)
+├── data/                — Sample PDF for testing
+├── screenshots/         — README screenshots
+├── eval_results.csv     — Saved evaluation scores
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
+​```
+
